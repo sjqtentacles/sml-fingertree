@@ -134,6 +134,74 @@ struct
       val () = checkIntList "original unchanged" ([1,2,3], F.toList base)
       val () = checkIntList "cons branch" ([0,1,2,3], F.toList b2)
       val () = checkIntList "snoc branch" ([1,2,3,4], F.toList b3)
+
+      val () = section "properties (sml-check, seed 0wx1)"
+      val seed : Check.seed = 0wx1
+      val smallInt = Check.choose (~1000, 1000)
+      val genList = Check.listOf smallInt
+      fun showIntList xs = "[" ^ String.concatWith "," (List.map Int.toString xs) ^ "]"
+      fun showPair (xs, ys) = showIntList xs ^ " / " ^ showIntList ys
+      fun showIntPair (x, xs) = Int.toString x ^ " / " ^ showIntList xs
+
+      (* fromList xs then toList reproduces xs exactly. *)
+      val () =
+        Harness.check "prop: fromList/toList round-trips"
+          (case Check.quickCheck
+                  (Check.forAll genList showIntList
+                     (fn xs => F.toList (F.fromList xs) = xs)) of
+               Check.Passed _ => true
+             | Check.Failed _ => false)
+
+      (* length always agrees with the length of toList. *)
+      val () =
+        Harness.check "prop: length = List.length o toList"
+          (case Check.quickCheck
+                  (Check.forAll genList showIntList
+                     (fn xs => F.length (F.fromList xs) = List.length xs)) of
+               Check.Passed _ => true
+             | Check.Failed _ => false)
+
+      (* cons x t then viewL immediately yields (x, t) back. *)
+      val () =
+        Harness.check "prop: cons x t; viewL = SOME (x, t)"
+          (case Check.quickCheck
+                  (Check.forAll
+                     (Check.tuple2 (smallInt, genList)) showIntPair
+                     (fn (x, xs) =>
+                        let val t = F.fromList xs
+                        in case F.viewL (F.cons x t) of
+                               SOME (y, t') => y = x andalso F.toList t' = xs
+                             | NONE => false
+                        end)) of
+               Check.Passed _ => true
+             | Check.Failed _ => false)
+
+      (* snoc x t then viewR immediately yields (x, t) back. *)
+      val () =
+        Harness.check "prop: snoc x t; viewR = SOME (x, t)"
+          (case Check.quickCheck
+                  (Check.forAll
+                     (Check.tuple2 (smallInt, genList)) showIntPair
+                     (fn (x, xs) =>
+                        let val t = F.fromList xs
+                        in case F.viewR (F.snoc x t) of
+                               SOME (y, t') => y = x andalso F.toList t' = xs
+                             | NONE => false
+                        end)) of
+               Check.Passed _ => true
+             | Check.Failed _ => false)
+
+      (* append's toList equals the concatenation of the two toLists. *)
+      val () =
+        Harness.check "prop: toList (append a b) = toList a @ toList b"
+          (case Check.quickCheck
+                  (Check.forAll
+                     (Check.tuple2 (genList, genList)) showPair
+                     (fn (xs, ys) =>
+                        F.toList (F.append (F.fromList xs) (F.fromList ys))
+                        = xs @ ys)) of
+               Check.Passed _ => true
+             | Check.Failed _ => false)
     in
       Harness.run ()
     end

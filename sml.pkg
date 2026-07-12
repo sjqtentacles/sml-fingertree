@@ -1,4 +1,5 @@
 package github.com/sjqtentacles/sml-fingertree
 
 require {
+  github.com/sjqtentacles/sml-check
 }
